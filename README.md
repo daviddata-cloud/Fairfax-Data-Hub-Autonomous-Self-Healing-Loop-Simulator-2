@@ -35,6 +35,7 @@ An **autonomous, offline AI agent** that watches a telemetry signal, decides whe
 
 ## 🧩 What This Project Is
 <img width="1908" height="945" alt="image" src="https://github.com/user-attachments/assets/3203a029-bbba-416d-8397-fa8b2168f383" />
+<img width="1881" height="747" alt="image" src="https://github.com/user-attachments/assets/f6d85c90-5997-4807-ae26-f4ac245c4084" />
 
 Two programs that cooperate:
 
