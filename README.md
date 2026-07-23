@@ -68,6 +68,104 @@ That file-rewrite is the autonomous action. The red warning badge on the dashboa
 
 ## 🏗 Architecture
 
+## Approach: AI Explains, Code Decides
+
+### Core concept
+
+This project demonstrates a general pattern for autonomous monitoring where an
+AI reasons about a live signal but **deterministic code makes every real
+decision**. The AI only explains what it sees in plain language; a human-set
+threshold rule — executed by code — makes the actual alert/action call. Because
+the AI never holds decision authority, a wrong or hallucinated model output can
+never trigger an unsafe action.
+
+The pattern has two layers:
+
+- **Signal layer** — produces the value to watch. The method changes by domain.
+- **Decision layer** — always the same: perceive the signal, let the AI explain,
+  then let code compare against a human-defined threshold and decide, with a
+  human approval gate for any production action.
+
+Only the signal layer changes per use case. The decision layer stays constant.
+That is what makes the approach general.
+
+### Two decisions, kept separate
+
+- **Step-Back (choose the method):** before acting, read the problem's features
+  and pick the right tool. This selects *how* to analyze the signal.
+- **Threshold decision (make the alert correct):** deterministic code compares
+  the signal to a human-set rule. This is what makes any single alert
+  trustworthy — not the AI, and not the analysis method.
+
+These are different steps. Step-Back picks the tool; code makes the call.
+
+### Domain 1 — Temperature (validated on a simulated signal)
+
+- Signal layer: Step-Back selects a solver — pseudo-spectral (forward problems,
+  128 collocation points) or a PINN / Physics-Informed Neural Network (inverse
+  problems, 256 collocation points) — to solve a Partial Differential Equation
+  (PDE) and produce the value.
+- Decision layer: code compares the value to a fixed threshold (e.g. 85°F) and
+  switches to safety mode if exceeded; the AI's opinion is used only for the
+  human-readable narration and is overridden if it disagrees.
+- Equations are used here because temperature is a continuous physical field and
+  we want to **predict** its trend or **fill in** values where sensors are
+  missing (sparse data / uncertain boundary conditions).
+
+### Domain 2 — IT logs (design, not yet built)
+
+- IT logs are not a physical field and have no PDE. The signal layer is replaced
+  with a knowledge-graph pipeline: stream logs into a store, continuously
+  extract entities and relations into a knowledge graph, then use **GraphRAG**
+  retrieval to pull the relevant sub-graph and an LLM to produce a root-cause
+  hypothesis and a plain-English explanation.
+- GraphRAG finds **relationships and root-cause candidates**, not proven
+  causation. It narrows the search and proposes the likely cause and its
+  propagation path; confirming true cause-and-effect still requires causal
+  analysis or controlled testing.
+- The heavy monitoring is done by streaming anomaly detection (cheap, fast,
+  runs 24/7). The LLM is triggered **on demand** to explain — it is not the
+  thing watching continuously. Think "sentinel vs. expert": lightweight
+  detection stands guard; GraphRAG + LLM is called in only when there's
+  something to analyze.
+- The decision layer is identical to the temperature case: code compares to a
+  human-set threshold and decides, with a human gate for production actions.
+
+### Honest status (what is built vs. what is new)
+
+- **Built (A):** the autonomous perceive → reason → decide → act loop with
+  code as the decision authority. Runs today on a **simulated** signal from a
+  physics simulation, not real-world data.
+- **Built elsewhere (B):** GraphRAG with a typed knowledge graph, semantic
+  retrieval, and page-level provenance — developed for research-document
+  navigation, not for streaming IT logs.
+- **New work required:** the pipeline that turns **streaming logs into a
+  continuously updated knowledge graph**, then connects that GraphRAG retrieval
+  into the reasoning step of the loop. This bridge exists in neither A nor B
+  today.
+- **Not fine-tuning:** this design stores data externally and retrieves it at
+  query time (GraphRAG), rather than baking knowledge into model weights.
+  Fine-tuning would only be considered later, and only to help a model read
+  domain-specific log formats — decision logic still stays in external data and
+  code rules.
+
+### One-paragraph summary
+
+I built a working autonomous-agent prototype where an AI reasons about a live
+signal but code makes every real decision — so the model can't cause an unsafe
+action. The same loop can watch our Azure IT logs and trigger remediation, or
+watch an early-response signal and draft an alert for human review. Today it
+runs on a simulated signal; the next step is connecting real data sources
+(including a streaming-logs-to-knowledge-graph pipeline for GraphRAG) and adding
+a human approval gate for production.
+
+
+<img width="1022" height="952" alt="image" src="https://github.com/user-attachments/assets/cfd83b38-5a96-4f6f-8255-c42b68aeab3f" />
+
+<img width="1022" height="949" alt="image" src="https://github.com/user-attachments/assets/d14dff39-9d28-42f1-8fae-a86c33d96af0" />
+
+
+
 ```
 ┌─────────────────────┐         ┌──────────────────────┐
 │  weather_agent.py   │         │      server.py       │
